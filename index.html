@@ -27,22 +27,32 @@
 
   <script>
     const ONESIGNAL_APP_ID = "e0befc38-70d7-40c6-9a4d-ad74d23863c7";
-    const SAFARI_WEB_ID = ""; // optional; e.g. "web.onesignal.auto.xxxxx-xxxx-xxxx-xxxx"
-    const SERVICE_WORKER_PATH = "OneSignalSDKWorker.js"; // you will upload this file (see note at bottom)
-    const SERVICE_WORKER_SCOPE = "/";                    // keep "/" if worker is at the site root
-    const DEFAULT_RETURN_URL = "https://prices.je/"; // where to send users after success
-    const WEBHOOK_URL = "/.netlify/functions/subscribe";
+    const SAFARI_WEB_ID = "";               // optional
+    const SERVICE_WORKER_PATH = "OneSignalSDKWorker.js";
+    const SERVICE_WORKER_SCOPE = "/";
+    const DEFAULT_RETURN_URL = "https://prices.je/"; // optional
 
     const params = new URLSearchParams(location.search);
-    const rowId = params.get("rowId") || "";
-    const email = params.get("email") || "";
-    const returnUrl = params.get("return") || DEFAULT_RETURN_URL;
+    const externalId = params.get("uid") || "";  // your user/account ID
+    const returnUrl  = params.get("return") || DEFAULT_RETURN_URL;
+    const tagsParam  = params.get("tags") || ""; // CSV of key:value
 
-    // Basic platform checks
+    // iOS needs Add to Home Screen (PWA) for web push
     const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-    // Defer init per OneSignal v16 pattern
+    // Parse tags from ?tags=plan:pro,tier:gold → { plan: "pro", tier: "gold" }
+    function parseTags(csv) {
+      if (!csv) return null;
+      const obj = {};
+      csv.split(",").forEach(pair => {
+        const [k, v] = pair.split(":").map(s => (s || "").trim());
+        if (k) obj[k] = v ?? "1";
+      });
+      return Object.keys(obj).length ? obj : null;
+    }
+
+    // OneSignal v16 deferred init
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
@@ -54,16 +64,15 @@
           allowLocalhostAsSecureOrigin: true
         });
 
-        // Attach your known user identifier so you can target by external_id
-        if (rowId) {
-          try { await OneSignal.login(rowId); } catch (e) { console.warn("login() will retry after permission:", e); }
+        // Pre-attach your external user ID (alias) if you have it
+        if (externalId) {
+          try { await OneSignal.login(externalId); } catch (e) { console.warn("login() will retry after permission:", e); }
         }
 
-        // Reflect current permission in UI
         const perm = await OneSignal.Notifications.getPermissionStatus(); // "default" | "granted" | "denied"
         updateStatus(`Browser permission: ${perm}`, perm === "granted" ? "ok" : "muted");
         if (perm === "granted") {
-          await afterGranted(OneSignal);
+          await finalizeSubscription(OneSignal);
         }
       } catch (e) {
         updateStatus("Failed to initialize OneSignal.", "err");
@@ -75,7 +84,6 @@
       const btn = document.getElementById("btn");
       btn.disabled = true;
 
-      // iOS requires running as an installed PWA for web push
       if (iOS && !isStandalone) {
         document.getElementById("iosHint").classList.remove("hidden");
         btn.disabled = false;
@@ -86,9 +94,8 @@
         const OneSignal = window.OneSignal;
         const result = await OneSignal.Notifications.requestPermission(); // "granted" | "denied"
         updateStatus(`User permission: ${result}`, result === "granted" ? "ok" : "err");
-
         if (result === "granted") {
-          await afterGranted(OneSignal);
+          await finalizeSubscription(OneSignal);
         } else {
           btn.disabled = false;
         }
@@ -99,49 +106,34 @@
       }
     }
 
-    async function afterGranted(OneSignal) {
+    async function finalizeSubscription(OneSignal) {
       try {
-        // Make sure external_id is set for targeting by alias later
-        if (rowId) {
-          try { await OneSignal.login(rowId); } catch {}
+        // Ensure external_id is set so you can target by External User ID in OneSignal
+        if (externalId) {
+          try { await OneSignal.login(externalId); } catch {}
         }
 
-        // Get the OneSignal user (player) ID for storage
-        let playerId = "";
-        try { playerId = await OneSignal.User.getId(); } catch {}
+        // Optionally set tags for segmentation (visible in OneSignal dashboard)
+        const tags = parseTags(tagsParam);
+        if (tags) {
+          try { await OneSignal.User.addTags(tags); } catch (e) { console.warn("addTags failed:", e); }
+        }
 
-        // Send to your Netlify Function (which holds the real secrets)
-        await sendToFunction({
-          rowId,
-          email,
-          playerId,
-          permission: "granted",
-          platform: iOS ? "iOS" : (navigator.platform || "web"),
-          userAgent: navigator.userAgent
-        });
+        // (Optional) fetch the OneSignal user ID for debugging
+        try {
+          const playerId = await OneSignal.User.getId();
+          console.log("OneSignal user ID:", playerId);
+        } catch {}
 
         document.getElementById("done").classList.remove("hidden");
         document.getElementById("btn").classList.add("hidden");
-
-        // Hop back to your Glide app (optional)
         setTimeout(() => { if (returnUrl) location.href = returnUrl; }, 700);
 
       } catch (e) {
-        updateStatus("Subscription saved locally but server update failed.", "err");
+        updateStatus("Subscription failed after permission.", "err");
         console.error(e);
         document.getElementById("btn").disabled = false;
       }
-    }
-
-    async function sendToFunction(payload) {
-      // CORS/Origin checks are enforced in the Netlify Function
-      const res = await fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        credentials: "omit"
-      });
-      if (!res.ok) throw new Error(`Function error (${res.status})`);
     }
 
     function updateStatus(text, cls = "muted") {
@@ -154,7 +146,7 @@
 <body>
   <div class="card">
     <h1>Enable Notifications</h1>
-    <p class="muted">Turn on push notifications for your account.</p>
+    <p class="muted">Turn on push notifications for your device.</p>
 
     <div id="iosHint" class="muted hidden">
       <p><strong>On iPhone/iPad:</strong> first add this page to your Home Screen, open it from there, then tap Enable.</p>
@@ -168,8 +160,8 @@
     </div>
 
     <p class="muted">
-      Tip: Link here from Glide with
-      <code>?rowId=&lt;ROW_ID&gt;&amp;email=&lt;EMAIL&gt;&amp;return=&lt;URL&gt;</code>
+      Tip: Link here with
+      <code>?uid=&lt;EXTERNAL_ID&gt;&amp;tags=plan:pro,tier:gold&amp;return=&lt;URL&gt;</code>
     </p>
   </div>
 </body>
