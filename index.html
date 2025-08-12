@@ -203,6 +203,31 @@
       <summary>Troubleshooting</summary>
       <p class="muted">If you blocked notifications before: re-enable in your browser’s Site settings. On iOS, you must run this page as a Home-Screen app; if you denied once, reinstall the app to reprompt.</p>
     </details>
+    <details>
+      <summary>Debug logs</summary>
+      <script>
+(function(){
+  const logBox = document.createElement('pre');
+  logBox.id = 'dev-logs';
+  logBox.style.cssText = 'white-space:pre-wrap;font:12px/1.4 ui-monospace,Menlo,monospace;background:#f7f7f7;padding:12px;border-radius:8px;margin-top:16px;max-height:40vh;overflow:auto;';
+  document.addEventListener('DOMContentLoaded', () => {
+    const wrap = document.querySelector('.wrap') || document.body;
+    const h = document.createElement('h2'); h.textContent = 'Debug logs'; h.style.fontSize='1rem'; h.style.margin='16px 0 8px';
+    wrap.appendChild(h); wrap.appendChild(logBox);
+  });
+  const write = (level, args) => {
+    const line = `[${new Date().toISOString()}] ${level.toUpperCase()}: ` + [...args].map(a => {
+      try { return typeof a==='string' ? a : JSON.stringify(a); } catch { return String(a); }
+    }).join(' ') + '\n';
+    logBox.textContent += line;
+  };
+  ['log','info','warn','error'].forEach(fn=>{
+    const orig = console[fn];
+    console[fn] = function(){ write(fn, arguments); orig && orig.apply(console, arguments); };
+  });
+})();
+</script>
+    </details>
   </main>
 </body>
 </html>
