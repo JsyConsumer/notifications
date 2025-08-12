@@ -49,13 +49,11 @@
   </style>
 
   <script>
-    // --- Edit these (safe to expose) ---
-    const ONESIGNAL_APP_ID     = "YOUR_ONESIGNAL_APP_ID";
+    const ONESIGNAL_APP_ID     = "e0befc38-70d7-40c6-9a4d-ad74d23863c7";
     const SAFARI_WEB_ID        = "";   // optional with v16; often not needed
     const SERVICE_WORKER_PATH  = "OneSignalSDKWorker.js";
     const SERVICE_WORKER_SCOPE = "/";
-    // -----------------------------------
-
+    
     // iOS needs PWA install
     const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
