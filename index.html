@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prices.je Notifications</title>
+
+  <!-- OneSignal Web SDK (v16) -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 2rem; }
+    .card { max-width: 640px; margin: 0 auto; padding: 1.5rem; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; }
+    h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+    p { margin: 0.5rem 0 1rem; line-height: 1.45; }
+    button { padding: .8rem 1rem; border-radius: 10px; border: 0; cursor: pointer; font-weight: 600; }
+    button.primary { background: #111; color: #fff; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .muted { opacity: .75; font-size: .95rem; }
+    .ok { color: #0a7f2e; font-weight: 600; }
+    .err { color: #b00020; font-weight: 600; }
+    .hidden { display: none; }
+    .row { margin-top: 1rem; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+    code { background: rgba(0,0,0,.06); padding: .1rem .35rem; border-radius: 6px; }
+  </style>
+
+  <script>
+    const ONESIGNAL_APP_ID = "e0befc38-70d7-40c6-9a4d-ad74d23863c7";
+    const SAFARI_WEB_ID = ""; // optional; e.g. "web.onesignal.auto.xxxxx-xxxx-xxxx-xxxx"
+    const SERVICE_WORKER_PATH = "OneSignalSDKWorker.js"; // you will upload this file (see note at bottom)
+    const SERVICE_WORKER_SCOPE = "/";                    // keep "/" if worker is at the site root
+    const DEFAULT_RETURN_URL = "https://prices.je/"; // where to send users after success
+    const WEBHOOK_URL = "/.netlify/functions/subscribe";
+
+    const params = new URLSearchParams(location.search);
+    const rowId = params.get("rowId") || "";
+    const email = params.get("email") || "";
+    const returnUrl = params.get("return") || DEFAULT_RETURN_URL;
+
+    // Basic platform checks
+    const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    // Defer init per OneSignal v16 pattern
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        await OneSignal.init({
+          appId: ONESIGNAL_APP_ID,
+          safariWebId: SAFARI_WEB_ID || undefined,
+          serviceWorkerPath: SERVICE_WORKER_PATH,
+          serviceWorkerParam: { scope: SERVICE_WORKER_SCOPE },
+          allowLocalhostAsSecureOrigin: true
+        });
+
+        // Attach your known user identifier so you can target by external_id
+        if (rowId) {
+          try { await OneSignal.login(rowId); } catch (e) { console.warn("login() will retry after permission:", e); }
+        }
+
+        // Reflect current permission in UI
+        const perm = await OneSignal.Notifications.getPermissionStatus(); // "default" | "granted" | "denied"
+        updateStatus(`Browser permission: ${perm}`, perm === "granted" ? "ok" : "muted");
+        if (perm === "granted") {
+          await afterGranted(OneSignal);
+        }
+      } catch (e) {
+        updateStatus("Failed to initialize OneSignal.", "err");
+        console.error(e);
+      }
+    });
+
+    async function requestPermission() {
+      const btn = document.getElementById("btn");
+      btn.disabled = true;
+
+      // iOS requires running as an installed PWA for web push
+      if (iOS && !isStandalone) {
+        document.getElementById("iosHint").classList.remove("hidden");
+        btn.disabled = false;
+        return;
+      }
+
+      try {
+        const OneSignal = window.OneSignal;
+        const result = await OneSignal.Notifications.requestPermission(); // "granted" | "denied"
+        updateStatus(`User permission: ${result}`, result === "granted" ? "ok" : "err");
+
+        if (result === "granted") {
+          await afterGranted(OneSignal);
+        } else {
+          btn.disabled = false;
+        }
+      } catch (e) {
+        updateStatus("Permission request failed.", "err");
+        console.error(e);
+        btn.disabled = false;
+      }
+    }
+
+    async function afterGranted(OneSignal) {
+      try {
+        // Make sure external_id is set for targeting by alias later
+        if (rowId) {
+          try { await OneSignal.login(rowId); } catch {}
+        }
+
+        // Get the OneSignal user (player) ID for storage
+        let playerId = "";
+        try { playerId = await OneSignal.User.getId(); } catch {}
+
+        // Send to your Netlify Function (which holds the real secrets)
+        await sendToFunction({
+          rowId,
+          email,
+          playerId,
+          permission: "granted",
+          platform: iOS ? "iOS" : (navigator.platform || "web"),
+          userAgent: navigator.userAgent
+        });
+
+        document.getElementById("done").classList.remove("hidden");
+        document.getElementById("btn").classList.add("hidden");
+
+        // Hop back to your Glide app (optional)
+        setTimeout(() => { if (returnUrl) location.href = returnUrl; }, 700);
+
+      } catch (e) {
+        updateStatus("Subscription saved locally but server update failed.", "err");
+        console.error(e);
+        document.getElementById("btn").disabled = false;
+      }
+    }
+
+    async function sendToFunction(payload) {
+      // CORS/Origin checks are enforced in the Netlify Function
+      const res = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "omit"
+      });
+      if (!res.ok) throw new Error(`Function error (${res.status})`);
+    }
+
+    function updateStatus(text, cls = "muted") {
+      const el = document.getElementById("status");
+      el.textContent = text;
+      el.className = cls;
+    }
+  </script>
+</head>
+<body>
+  <div class="card">
+    <h1>Enable Notifications</h1>
+    <p class="muted">Turn on push notifications for your account.</p>
+
+    <div id="iosHint" class="muted hidden">
+      <p><strong>On iPhone/iPad:</strong> first add this page to your Home Screen, open it from there, then tap Enable.</p>
+      <p>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then re-open.</p>
+    </div>
+
+    <div class="row">
+      <button id="btn" class="primary" onclick="requestPermission()">Enable notifications</button>
+      <span id="status" class="muted">Waiting for your action…</span>
+      <span id="done" class="ok hidden">All set! You can close this page.</span>
+    </div>
+
+    <p class="muted">
+      Tip: Link here from Glide with
+      <code>?rowId=&lt;ROW_ID&gt;&amp;email=&lt;EMAIL&gt;&amp;return=&lt;URL&gt;</code>
+    </p>
+  </div>
+</body>
+</html>
