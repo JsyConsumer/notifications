@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Prices.je Notifications</title>
+  <title>Enable Notifications</title>
 
   <!-- OneSignal Web SDK (v16) -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -46,7 +46,6 @@
     .btn:disabled { opacity: .55; cursor: not-allowed; }
 
     details { margin-top: 14px; }
-    code { background: rgba(0,0,0,.06); padding: .12rem .35rem; border-radius: 6px; }
   </style>
 
   <script>
@@ -56,22 +55,10 @@
     const SERVICE_WORKER_SCOPE = "/";
     const DEFAULT_RETURN_URL = "https://prices.je/"; // optional
 
-    const params = new URLSearchParams(location.search);
-    const externalId = params.get("uid") || "";  // your user/account ID
-    const returnUrl  = params.get("return") || DEFAULT_RETURN_URL;
-    const tagsParam  = params.get("tags") || ""; // CSV of key:value
+    const params   = new URLSearchParams(location.search);
+    const returnTo = params.get("return") || DEFAULT_RETURN_URL;
 
-    function parseTags(csv) {
-      if (!csv) return null;
-      const out = {};
-      csv.split(",").forEach(p => {
-        const [k, v] = p.split(":").map(s => (s||"").trim());
-        if (k) out[k] = v ?? "1";
-      });
-      return Object.keys(out).length ? out : null;
-    }
-
-    // Basic platform checks (for iOS hint)
+    // iOS needs PWA install
     const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -127,9 +114,6 @@
 
     async function afterGranted(OneSignal) {
       try {
-        const tags = parseTags(tagsCSV);
-        if (tags) { try { await OneSignal.User.addTags(tags); } catch (e) { console.warn("addTags:", e); } }
-
         try { console.log("OneSignal user ID:", await OneSignal.User.getId()); } catch {}
 
         document.getElementById("done").classList.remove("hidden");
@@ -176,7 +160,7 @@
 <body>
   <main class="wrap">
     <h1>Enable Notifications</h1>
-    <p class="muted">Turn on push notifications for this device. Buttons use the same blue as your app.</p>
+    <p class="muted">Turn on push notifications for this device.</p>
 
     <div id="iosHint" class="muted hidden" aria-live="polite">
       <p><strong>On iPhone/iPad:</strong> add this page to your <strong>Home Screen</strong>, open it from there, then tap Enable.</p>
@@ -191,8 +175,8 @@
     </div>
 
     <details>
-      <summary>Troubleshooting & settings</summary>
-      <p class="muted">If you blocked notifications before, open your browser’s <em>Site settings</em> for this page and set <strong>Notifications</strong> to <em>Allow</em>. On iOS, it must be installed to the Home Screen first.</p>
+      <summary>Troubleshooting</summary>
+      <p class="muted">If you blocked notifications before, open your browser’s <em>Site settings</em> for this page and set <strong>Notifications</strong> to <em>Allow</em>. On iOS, the page must be installed on the Home Screen first.</p>
     </details>
   </main>
 </body>
