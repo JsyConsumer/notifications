@@ -3,30 +3,50 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Prices.je Notifications</title>
+  <title>Enable Notifications</title>
 
-  <!-- iOS installable web app -->
+  <!-- (Optional but recommended for iOS PWA) -->
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="apple-touch-icon" href="https://mmo.aiircdn.com/1466/689b69c47dc12.png">
   <meta name="theme-color" content="#0068B3">
 
   <!-- OneSignal Web SDK (v16) -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 
   <style>
-    :root { --blue:#0068B3; --text:#182026; --bg:#fff; --ok:#0a7f2e; --err:#b00020; }
-    html,body { height:100% }
-    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text) }
-    .wrap { max-width:720px; margin:0 auto; padding:24px }
-    h1 { margin:0 0 8px; font-size:1.25rem }
-    p { margin:8px 0 16px; line-height:1.45 }
-    .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center }
-    .muted { opacity:.75 } .ok{ color:var(--ok); font-weight:600 } .err{ color:var(--err); font-weight:600 }
-    .hidden { display:none!important }
-    .btn { appearance:none; border:0; border-radius:10px; padding:.8rem 1rem; font-weight:600; cursor:pointer }
-    .btn.primary { background:var(--blue); color:#fff } .btn.outline{ background:transparent; color:var(--blue); border:2px solid var(--blue) }
-    .btn:disabled { opacity:.55; cursor:not-allowed }
+    :root {
+      --blue: #0068B3;
+      --text: #182026;
+      --bg: #ffffff;
+      --ok: #0a7f2e;
+      --err: #b00020;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 8px; font-size: 1.25rem; }
+    p  { margin: 8px 0 16px; line-height: 1.45; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .muted { opacity: .75; }
+    .ok { color: var(--ok); font-weight: 600; }
+    .err { color: var(--err); font-weight: 600; }
+    .hidden { display: none !important; }
+
+    .btn {
+      appearance: none; border: 0; border-radius: 10px;
+      padding: .8rem 1rem; font-weight: 600; cursor: pointer;
+    }
+    .btn.primary { background: var(--blue); color: #fff; }
+    .btn.outline  { background: transparent; color: var(--blue); border: 2px solid var(--blue); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    details { margin-top: 14px; }
   </style>
 
   <script>
@@ -34,16 +54,19 @@
     const SAFARI_WEB_ID        = "";   // optional for v16
     const SERVICE_WORKER_PATH  = "OneSignalSDKWorker.js";
     const SERVICE_WORKER_SCOPE = "/";
+    // Optional debug: add ?debug=1 to URL for verbose logs
+    const debug = new URLSearchParams(location.search).get("debug") === "1";
 
-    // iOS detection: prefer navigator.standalone; fall back to display-mode
+    // Robust iOS PWA check
     const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const inStandalone = (('standalone' in navigator) && navigator.standalone) ||
                          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
 
-    // OneSignal init
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
+        if (debug && OneSignal?.Debug?.setLogLevel) OneSignal.Debug.setLogLevel('trace');
+
         await OneSignal.init({
           appId: ONESIGNAL_APP_ID,
           safariWebId: SAFARI_WEB_ID || undefined,
@@ -52,14 +75,21 @@
           allowLocalhostAsSecureOrigin: true
         });
 
-        // If we’re on iOS but NOT launched from Home Screen, show instructions and bail.
+        // If on iOS but NOT running from Home Screen, explain and lock the button.
         if (isiOS && !inStandalone) {
-          setStatus("Install to Home Screen first (Share → Add to Home Screen), then open from the icon.", "err");
+          setStatus("Install to Home Screen first (Share → Add to Home Screen), then open and try again.", "err");
           document.getElementById("iosHint").classList.remove("hidden");
           document.getElementById("enable").disabled = true;
           return;
         }
 
+        // If push isn’t supported in this context, keep other platforms working but show a hint.
+        if (!OneSignal.Notifications.isPushSupported()) {
+          setStatus("Notifications aren’t supported in this browser/app context.", "err");
+          return;
+        }
+
+        // Normal path for Android/desktop (and iOS PWA once installed)
         const granted = OneSignal.Notifications.permission; // boolean
         setStatus(`Browser permission: ${granted ? "granted" : "default/denied"}`, granted ? "ok" : "muted");
         if (granted) await afterGranted(OneSignal);
@@ -78,7 +108,7 @@
       const btn = document.getElementById("enable");
       btn.disabled = true;
 
-      // Guard again at click-time for iOS HS requirement
+      // Guard again for iOS HS requirement
       if (isiOS && !inStandalone) {
         document.getElementById("iosHint").classList.remove("hidden");
         setStatus("Install to Home Screen and open from there to enable.", "err");
@@ -88,14 +118,25 @@
 
       try {
         const OneSignal = window.OneSignal;
-        await OneSignal.Notifications.requestPermission(); // v16: no return
+        if (!OneSignal.Notifications.isPushSupported()) {
+          throw new Error("Push not supported in this context");
+        }
+
+        // Prefer optIn(): lets SDK manage the native prompt & subscription
+        await OneSignal.User.PushSubscription.optIn();
+
         const granted = OneSignal.Notifications.permission;
         setStatus(`User permission: ${granted ? "granted" : "denied"}`, granted ? "ok" : "err");
-        if (granted) await afterGranted(OneSignal);
-        else btn.disabled = false;
+        if (granted) {
+          await afterGranted(OneSignal);
+        } else {
+          // On iOS, a prior deny requires reinstall to reprompt
+          if (isiOS) document.getElementById("iosDenied").classList.remove("hidden");
+          btn.disabled = false;
+        }
       } catch (e) {
+        console.error("Enable failed:", e);
         setStatus("Permission request failed.", "err");
-        console.error(e);
         btn.disabled = false;
       }
     }
@@ -148,7 +189,10 @@
     <p class="muted">Turn on push notifications for this device.</p>
 
     <div id="iosHint" class="muted hidden" aria-live="polite">
-      <p><strong>iPhone/iPad:</strong> open this page in <strong>Safari</strong>, tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then open it from the new Home-Screen icon and tap Enable.</p>
+      <p><strong>iPhone/iPad:</strong> open this page in <strong>Safari</strong>, tap <strong>Share</strong> → <strong>Add to Home Screen</strong>. Then open it from the Home-Screen icon and tap Enable.</p>
+    </div>
+    <div id="iosDenied" class="muted hidden" aria-live="polite">
+      <p>It looks like notifications were previously denied. On iOS, remove the Home-Screen app, clear the site’s data in Settings → Safari → Advanced → Website Data, re-add to Home Screen, then try again.</p>
     </div>
 
     <div class="row" role="group" aria-label="Push actions">
@@ -160,7 +204,7 @@
 
     <details>
       <summary>Troubleshooting</summary>
-      <p class="muted">iOS only allows web push from Home-Screen web apps (iOS 16.4+). If you blocked notifications before, use your browser’s Site settings to allow them.</p>
+      <p class="muted">If you blocked notifications before: re-enable in your browser’s Site settings. On iOS, you must run this page as a Home-Screen app; if you denied once, reinstall the app to reprompt.</p>
     </details>
   </main>
 </body>
