@@ -9,6 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0068B3">
 
+  <!-- OneSignal Web SDK (v16) -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 
   <style>
@@ -48,15 +49,55 @@
   </style>
 
   <script>
+    // -------------------- CONFIG --------------------
     const ONESIGNAL_APP_ID     = "e0befc38-70d7-40c6-9a4d-ad74d23863c7";
     const SAFARI_WEB_ID        = "";   // optional for v16
     const SERVICE_WORKER_PATH  = "OneSignalSDKWorker.js";
     const SERVICE_WORKER_SCOPE = "/";
-    
+    // ------------------------------------------------
+
+    // ---- Platform detection (kept as-is) ----
     const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const inStandalone = (('standalone' in navigator) && navigator.standalone) ||
                          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
 
+    // ---- Simple on-page logger + console mirroring ----
+    (function(){
+      const style = 'white-space:pre-wrap;font:12px/1.4 ui-monospace,Menlo,monospace;background:#f7f7f7;padding:12px;border-radius:8px;margin-top:16px;max-height:40vh;overflow:auto;';
+      const boot = () => {
+        const wrap = document.querySelector('.wrap') || document.body;
+        const h = document.createElement('h2'); h.textContent = 'Debug logs'; h.style.fontSize='1rem'; h.style.margin='16px 0 8px';
+        const pre = document.createElement('pre'); pre.id='dev-logs'; pre.style.cssText = style;
+        wrap.appendChild(h); wrap.appendChild(pre);
+        // First line
+        write('info', [`Boot @ ${new Date().toISOString()} | ${location.origin}${location.pathname} | UA: ${navigator.userAgent}`]);
+      };
+      const write = (level, args) => {
+        const box = document.getElementById('dev-logs');
+        if (!box) return;
+        const line = `[${new Date().toISOString()}] ${level.toUpperCase()}: ` + [...args].map(a => {
+          try { return typeof a==='string' ? a : JSON.stringify(a); } catch { return String(a); }
+        }).join(' ') + '\n';
+        box.textContent += line;
+        box.scrollTop = box.scrollHeight;
+      };
+      ['log','info','warn','error'].forEach(fn=>{
+        const orig = console[fn];
+        console[fn] = function(){ write(fn, arguments); orig && orig.apply(console, arguments); };
+      });
+      window.addEventListener('DOMContentLoaded', boot);
+      window.__writeLog = write; // in case we need it elsewhere
+    })();
+
+    // ---- Extra global error visibility ----
+    window.addEventListener('error', (e) => {
+      console.error('[window-error]', e.message, e.filename, e.lineno, e.colno);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      console.error('[unhandledrejection]', e.reason || e);
+    });
+
+    // ---- OneSignal boot with always-on trace logs ----
     window.OneSignalDeferred = window.OneSignalDeferred || [];
 
     window.OneSignalDeferred.push(function(OneSignal) {
@@ -64,12 +105,96 @@
         OneSignal.Debug.setLogLevel('trace');
         console.log('[OneSignal] Debug log level set to trace');
       } catch (e) {
-        console.warn('Could not enable OneSignal debug logs yet:', e);
+        console.warn('Could not enable OneSignal debug logs yet:', e && (e.message || e));
       }
     });
 
+    // Diagnostics helper
+    async function runDiagnostics(userGesture = false) {
+      console.log('[Diag] Start', { userGesture });
+      console.log('[Diag] Env', {
+        origin: location.origin,
+        href: location.href,
+        isiOS, inStandalone,
+        notifPermission: (window.Notification && Notification.permission) || 'unsupported',
+        swController: !!navigator.serviceWorker?.controller
+      });
+
+      // Check worker file fetchability
+      try {
+        const url = new URL(SERVICE_WORKER_PATH, location.href).href;
+        const resp = await fetch(url, { cache: 'no-store' });
+        console.log('[Diag] Worker fetch', { url, status: resp.status, ok: resp.ok, type: resp.type, ct: resp.headers.get('content-type') });
+      } catch (e) {
+        console.error('[Diag] Worker fetch error', e && (e.message || e));
+      }
+
+      // List SW registrations
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        console.log('[Diag] SW registrations', regs.map(r => ({ scope: r.scope, active: !!r.active, installing: !!r.installing, waiting: !!r.waiting })));
+      } catch (e) {
+        console.error('[Diag] getRegistrations error', e && (e.message || e));
+      }
+
+      // OneSignal state (if available)
+      const OS = window.OneSignal;
+      if (OS?.Notifications) {
+        try { console.log('[Diag] OneSignal.isPushSupported()', OS.Notifications.isPushSupported()); } catch(e) { console.error('[Diag] isPushSupported error', e); }
+        try { console.log('[Diag] OneSignal.permission(bool)', OS.Notifications.permission); } catch(e) { console.error('[Diag] permission error', e); }
+        try {
+          const uid = await OS.User.getId();
+          const subId = OS.User?.PushSubscription?.id || null;
+          console.log('[Diag] OneSignal user', { uid, subId });
+        } catch (e) { console.error('[Diag] getId error', e && (e.message || e)); }
+      } else {
+        console.warn('[Diag] OneSignal not ready yet');
+      }
+
+      // Optional native probe (inside a user gesture; iOS will only allow this then)
+      try {
+        if (userGesture && window.Notification && typeof Notification.requestPermission === 'function') {
+          if (Notification.permission === 'default') {
+            const res = await Notification.requestPermission();
+            console.log('[Diag] Notification.requestPermission() ->', res);
+          } else {
+            console.log('[Diag] Skipped Notification.requestPermission (current=', Notification.permission, ')');
+          }
+        }
+      } catch (e) {
+        console.error('[Diag] requestPermission threw', e && (e.message || e));
+      }
+
+      console.log('[Diag] End');
+    }
+
+    function copyLogs() {
+      const el = document.getElementById('dev-logs');
+      if (!el) return;
+      const txt = el.textContent || '';
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(txt).then(() => alert('Logs copied to clipboard')).catch(() => fallback());
+      } else {
+        fallback();
+      }
+      function fallback() {
+        try {
+          const range = document.createRange(); range.selectNode(el);
+          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+          document.execCommand('copy'); sel.removeAllRanges();
+          alert('Logs copied');
+        } catch {}
+      }
+    }
+
+    // Main init
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
+        console.log('[Init] Calling OneSignal.init() with', {
+          appId: ONESIGNAL_APP_ID, safariWebId: !!SAFARI_WEB_ID,
+          serviceWorkerPath: SERVICE_WORKER_PATH, serviceWorkerScope: SERVICE_WORKER_SCOPE
+        });
+
         await OneSignal.init({
           appId: ONESIGNAL_APP_ID,
           safariWebId: SAFARI_WEB_ID || undefined,
@@ -78,35 +203,57 @@
           allowLocalhostAsSecureOrigin: true
         });
 
+        // iOS must be opened from Home Screen
         if (isiOS && !inStandalone) {
           setStatus("Install to Home Screen first (Share → Add to Home Screen), then open and try again.", "err");
           document.getElementById("iosHint").classList.remove("hidden");
           document.getElementById("enable").disabled = true;
+          console.warn('[Init] iOS but not standalone. Button disabled.');
           return;
         }
 
         if (!OneSignal.Notifications.isPushSupported()) {
           setStatus("Notifications aren’t supported in this browser/app context.", "err");
+          console.warn('[Init] Push not supported in this context');
           return;
         }
 
         const granted = OneSignal.Notifications.permission; // boolean
+        console.log('[Init] OneSignal.Notifications.permission ->', granted);
         setStatus(`Browser permission: ${granted ? "granted" : "default/denied"}`, granted ? "ok" : "muted");
         if (granted) await afterGranted(OneSignal);
 
-        OneSignal.Notifications.addEventListener("permissionChange", (permission) => {
-          setStatus(`Browser permission: ${permission ? "granted" : "denied"}`, permission ? "ok" : "err");
-          if (permission) afterGranted(OneSignal);
-        });
+        // Helpful listeners
+        try {
+          OneSignal.Notifications.addEventListener("permissionChange", (permission) => {
+            console.log('[Event] permissionChange ->', permission);
+            setStatus(`Browser permission: ${permission ? "granted" : "denied"}`, permission ? "ok" : "err");
+            if (permission) afterGranted(OneSignal);
+          });
+          // Some builds expose this; guard just in case
+          if (OneSignal.Notifications.addEventListener) {
+            OneSignal.Notifications.addEventListener("permissionPromptDisplay", () => {
+              console.log('[Event] permissionPromptDisplay');
+            });
+          }
+        } catch (e) {
+          console.warn('[Init] Could not attach some event listeners', e && (e.message || e));
+        }
+
+        console.log('[Init] Completed');
       } catch (e) {
         setStatus("Failed to initialize OneSignal.", "err");
-        console.error(e);
+        console.error('[Init] Error', e && (e.stack || e.message || e));
       }
     });
 
+    // --------------------- UI actions ---------------------
     async function onEnableClick() {
       const btn = document.getElementById("enable");
       btn.disabled = true;
+
+      // Run diagnostics inside the user gesture (lets iOS allow the native probe)
+      await runDiagnostics(true);
 
       if (isiOS && !inStandalone) {
         document.getElementById("iosHint").classList.remove("hidden");
@@ -117,13 +264,15 @@
 
       try {
         const OneSignal = window.OneSignal;
-        if (!OneSignal.Notifications.isPushSupported()) {
+        if (!OneSignal?.Notifications?.isPushSupported?.()) {
           throw new Error("Push not supported in this context");
         }
 
+        console.log('[Enable] Calling OneSignal.User.PushSubscription.optIn()');
         await OneSignal.User.PushSubscription.optIn();
 
         const granted = OneSignal.Notifications.permission;
+        console.log('[Enable] Final permission ->', granted);
         setStatus(`User permission: ${granted ? "granted" : "denied"}`, granted ? "ok" : "err");
         if (granted) {
           await afterGranted(OneSignal);
@@ -132,7 +281,8 @@
           btn.disabled = false;
         }
       } catch (e) {
-        console.error("Enable failed:", e);
+        const errMsg = (e && (e.stack || e.message)) || JSON.stringify(e) || String(e);
+        console.error("Enable failed:", errMsg);
         setStatus("Permission request failed.", "err");
         btn.disabled = false;
       }
@@ -140,13 +290,19 @@
 
     async function afterGranted(OneSignal) {
       try {
-        try { console.log("OneSignal user ID:", await OneSignal.User.getId()); } catch {}
+        try {
+          const userId = await OneSignal.User.getId();
+          const subId = OneSignal.User?.PushSubscription?.id || null;
+          console.log("[afterGranted] userId:", userId, "subscriptionId:", subId);
+        } catch (e) {
+          console.warn('[afterGranted] Could not read user/sub IDs', e && (e.message || e));
+        }
         document.getElementById("done").classList.remove("hidden");
         document.getElementById("enable").classList.add("hidden");
         document.getElementById("disable").classList.remove("hidden");
       } catch (e) {
         setStatus("Subscribed, but a final step failed.", "err");
-        console.error(e);
+        console.error('[afterGranted] Error', e && (e.message || e));
         document.getElementById("enable").disabled = false;
       }
     }
@@ -157,8 +313,10 @@
       const OneSignal = window.OneSignal;
       try {
         if (OneSignal?.User?.PushSubscription?.optOut) {
+          console.log('[Disable] Calling optOut()');
           await OneSignal.User.PushSubscription.optOut();
         } else if (OneSignal?.Notifications?.unsubscribe) {
+          console.log('[Disable] Calling Notifications.unsubscribe() (legacy)');
           await OneSignal.Notifications.unsubscribe();
         }
         setStatus("Notifications disabled on this device.", "ok");
@@ -166,7 +324,7 @@
         document.getElementById("enable").classList.remove("hidden");
         btn.classList.add("hidden");
       } catch (e) {
-        console.error(e);
+        console.error('[Disable] Error', e && (e.message || e));
         setStatus("Couldn’t disable here. Use your browser’s site settings.", "err");
       } finally {
         btn.disabled = false;
@@ -203,30 +361,13 @@
       <summary>Troubleshooting</summary>
       <p class="muted">If you blocked notifications before: re-enable in your browser’s Site settings. On iOS, you must run this page as a Home-Screen app; if you denied once, reinstall the app to reprompt.</p>
     </details>
+
     <details>
-      <summary>Debug logs</summary>
-      <script>
-(function(){
-  const logBox = document.createElement('pre');
-  logBox.id = 'dev-logs';
-  logBox.style.cssText = 'white-space:pre-wrap;font:12px/1.4 ui-monospace,Menlo,monospace;background:#f7f7f7;padding:12px;border-radius:8px;margin-top:16px;max-height:40vh;overflow:auto;';
-  document.addEventListener('DOMContentLoaded', () => {
-    const wrap = document.querySelector('.wrap') || document.body;
-    const h = document.createElement('h2'); h.textContent = 'Debug logs'; h.style.fontSize='1rem'; h.style.margin='16px 0 8px';
-    wrap.appendChild(h); wrap.appendChild(logBox);
-  });
-  const write = (level, args) => {
-    const line = `[${new Date().toISOString()}] ${level.toUpperCase()}: ` + [...args].map(a => {
-      try { return typeof a==='string' ? a : JSON.stringify(a); } catch { return String(a); }
-    }).join(' ') + '\n';
-    logBox.textContent += line;
-  };
-  ['log','info','warn','error'].forEach(fn=>{
-    const orig = console[fn];
-    console[fn] = function(){ write(fn, arguments); orig && orig.apply(console, arguments); };
-  });
-})();
-</script>
+      <summary>Debug & diagnostics</summary>
+      <div class="row" style="margin-top:8px; gap:8px;">
+        <button class="btn outline" onclick="runDiagnostics(false)">Run diagnostics</button>
+        <button class="btn outline" onclick="copyLogs()">Copy logs</button>
+      </div>
     </details>
   </main>
 </body>
