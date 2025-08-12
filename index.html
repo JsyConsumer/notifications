@@ -3,14 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Enable Notifications</title>
+  <title>Prices.je Notifications</title>
 
-  <!-- (Optional but recommended for iOS PWA) -->
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0068B3">
 
-  <!-- OneSignal Web SDK (v16) -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 
   <style>
@@ -54,19 +52,24 @@
     const SAFARI_WEB_ID        = "";   // optional for v16
     const SERVICE_WORKER_PATH  = "OneSignalSDKWorker.js";
     const SERVICE_WORKER_SCOPE = "/";
-    // Optional debug: add ?debug=1 to URL for verbose logs
-    const debug = new URLSearchParams(location.search).get("debug") === "1";
-
-    // Robust iOS PWA check
+    
     const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const inStandalone = (('standalone' in navigator) && navigator.standalone) ||
                          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
 
     window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+    window.OneSignalDeferred.push(function(OneSignal) {
+      try {
+        OneSignal.Debug.setLogLevel('trace');
+        console.log('[OneSignal] Debug log level set to trace');
+      } catch (e) {
+        console.warn('Could not enable OneSignal debug logs yet:', e);
+      }
+    });
+
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
-        if (debug && OneSignal?.Debug?.setLogLevel) OneSignal.Debug.setLogLevel('trace');
-
         await OneSignal.init({
           appId: ONESIGNAL_APP_ID,
           safariWebId: SAFARI_WEB_ID || undefined,
@@ -75,7 +78,6 @@
           allowLocalhostAsSecureOrigin: true
         });
 
-        // If on iOS but NOT running from Home Screen, explain and lock the button.
         if (isiOS && !inStandalone) {
           setStatus("Install to Home Screen first (Share → Add to Home Screen), then open and try again.", "err");
           document.getElementById("iosHint").classList.remove("hidden");
@@ -83,13 +85,11 @@
           return;
         }
 
-        // If push isn’t supported in this context, keep other platforms working but show a hint.
         if (!OneSignal.Notifications.isPushSupported()) {
           setStatus("Notifications aren’t supported in this browser/app context.", "err");
           return;
         }
 
-        // Normal path for Android/desktop (and iOS PWA once installed)
         const granted = OneSignal.Notifications.permission; // boolean
         setStatus(`Browser permission: ${granted ? "granted" : "default/denied"}`, granted ? "ok" : "muted");
         if (granted) await afterGranted(OneSignal);
@@ -108,7 +108,6 @@
       const btn = document.getElementById("enable");
       btn.disabled = true;
 
-      // Guard again for iOS HS requirement
       if (isiOS && !inStandalone) {
         document.getElementById("iosHint").classList.remove("hidden");
         setStatus("Install to Home Screen and open from there to enable.", "err");
@@ -122,7 +121,6 @@
           throw new Error("Push not supported in this context");
         }
 
-        // Prefer optIn(): lets SDK manage the native prompt & subscription
         await OneSignal.User.PushSubscription.optIn();
 
         const granted = OneSignal.Notifications.permission;
@@ -130,7 +128,6 @@
         if (granted) {
           await afterGranted(OneSignal);
         } else {
-          // On iOS, a prior deny requires reinstall to reprompt
           if (isiOS) document.getElementById("iosDenied").classList.remove("hidden");
           btn.disabled = false;
         }
@@ -192,7 +189,7 @@
       <p><strong>iPhone/iPad:</strong> open this page in <strong>Safari</strong>, tap <strong>Share</strong> → <strong>Add to Home Screen</strong>. Then open it from the Home-Screen icon and tap Enable.</p>
     </div>
     <div id="iosDenied" class="muted hidden" aria-live="polite">
-      <p>It looks like notifications were previously denied. On iOS, remove the Home-Screen app, clear the site’s data in Settings → Safari → Advanced → Website Data, re-add to Home Screen, then try again.</p>
+      <p>It looks like notifications were previously denied. On iOS, remove the Home-Screen app, clear the site’s data (Settings → Safari → Advanced → Website Data), re-add to Home Screen, then try again.</p>
     </div>
 
     <div class="row" role="group" aria-label="Push actions">
