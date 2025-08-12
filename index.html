@@ -1,99 +1,52 @@
 <!doctype html>
-<html lang="en" class="production" style="overflow: hidden">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width,initial-scale=1,shrink-to-fit=no,user-scalable=no,viewport-fit=cover"
-  />
-  <title>Notifications | Prices.je</title>
-
-  <!-- Theme + icons to feel like your app -->
-  <meta name="theme-color" content="#F6F6F6" />
-  <link rel="icon" type="image/png" sizes="16x16"
-        href="https://firebasestorage.googleapis.com/v0/b/glide-prod.appspot.com/o/pwa-assets%2F4ihM9Fq9sif4KVwjGsAU-favicon-16.png?alt=media">
-  <link rel="icon" type="image/png" sizes="32x32"
-        href="https://firebasestorage.googleapis.com/v0/b/glide-prod.appspot.com/o/pwa-assets%2F4ihM9Fq9sif4KVwjGsAU-favicon-32.png?alt=media">
-  <link href="https://fonts.googleapis.com/css?family=Roboto+Mono|Roboto:400,500,700,900&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Prices.je Notifications</title>
 
   <!-- OneSignal Web SDK (v16) -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 
   <style>
     :root {
-      --accent: #0068B3;             /* matches your primaryAccentColor */
+      --blue: #0068B3;
       --text: #182026;
       --bg: #ffffff;
-      --card: #ffffff;
-      --muted: rgba(0,0,0,.7);
       --ok: #0a7f2e;
       --err: #b00020;
-      color-scheme: light dark;
     }
-
-    html { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; height: 100%; background: var(--bg); }
-    @media (prefers-color-scheme: dark) { html { background: #131315; } }
-    body { margin: 0; height: 100%; background: transparent; color: var(--text); -webkit-overflow-scrolling: touch; }
-
-    /* ====== HEADER (match Glide header bar) ====== */
-    .nav {
-      position: sticky; top: 0; left: 0; right: 0;
-      background: var(--accent);
-      height: calc(4.5rem + env(safe-area-inset-top));
-      padding-top: env(safe-area-inset-top);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 1000;
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
     }
-    .nav-inner {
-      height: 4.5rem; width: 100%;
-      display: flex; align-items: center; justify-content: center;
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px;
     }
-    .logo {
-      width: 200px; height: auto; /* mirrors your custom CSS */
-      display: flex; align-items: center; justify-content: center;
-    }
-    .logo img {
-      max-height: 4rem; max-width: 500px; object-fit: contain; display: block;
-      filter: brightness(0) invert(1); /* make white on blue like Glide header */
-    }
-
-    /* ====== PAGE LAYOUT ====== */
-    .container {
-      max-width: 880px; margin: 0 auto; padding: 1.25rem;
-    }
-    .card {
-      background: var(--card); border: 1px solid rgba(0,0,0,.08);
-      border-radius: 16px; padding: 1.25rem;
-      box-shadow: 0 1px 2px rgba(0,0,0,.04);
-    }
-    h1 { margin: 0 0 0.25rem; font-size: 1.25rem; font-weight: 700; }
-    p { margin: 0.5rem 0 1rem; line-height: 1.45; }
-    .row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: .5rem; }
-    .muted { opacity: .75; font-size: .95rem; }
+    h1 { margin: 0 0 8px; font-size: 1.25rem; }
+    p  { margin: 8px 0 16px; line-height: 1.45; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .muted { opacity: .75; }
     .ok { color: var(--ok); font-weight: 600; }
     .err { color: var(--err); font-weight: 600; }
     .hidden { display: none !important; }
 
-    /* Buttons */
     .btn {
-      appearance: none; border: 0; border-radius: 10px; padding: .8rem 1rem;
-      font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: .5rem;
+      appearance: none; border: 0; border-radius: 10px;
+      padding: .8rem 1rem; font-weight: 600; cursor: pointer;
     }
-    .btn.primary { background: #111; color: #fff; }
-    .btn.ghost { background: transparent; color: var(--accent); border: 2px solid var(--accent); }
-    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn.primary { background: var(--blue); color: #fff; }
+    .btn.outline  { background: transparent; color: var(--blue); border: 2px solid var(--blue); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
 
-    /* Helper panel */
-    details.helper {
-      margin-top: 1rem; border: 1px dashed rgba(0,0,0,.15); border-radius: 12px; padding: .75rem 1rem;
-    }
-    details.helper > summary { cursor: pointer; font-weight: 600; outline: none; }
-    .steps { margin-top: .5rem; }
-    .steps li { margin: .35rem 0; }
-
-    .footer-note { margin-top: 1rem; font-size: .9rem; opacity: .75; }
-    code { background: rgba(0,0,0,.06); padding: .1rem .35rem; border-radius: 6px; }
+    details { margin-top: 14px; }
+    code { background: rgba(0,0,0,.06); padding: .12rem .35rem; border-radius: 6px; }
   </style>
 
   <script>
@@ -111,24 +64,18 @@
     function parseTags(csv) {
       if (!csv) return null;
       const out = {};
-      csv.split(",").forEach(pair => {
-        const [k,v] = pair.split(":").map(s => (s||"").trim());
+      csv.split(",").forEach(p => {
+        const [k, v] = p.split(":").map(s => (s||"").trim());
         if (k) out[k] = v ?? "1";
       });
       return Object.keys(out).length ? out : null;
     }
 
-    // Platform checks
+    // Basic platform checks (for iOS hint)
     const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const isAndroid = /Android/.test(navigator.userAgent);
-    const isMac = /Macintosh/.test(navigator.userAgent);
-    const isWindows = /Windows/.test(navigator.userAgent);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const isFirefox = /Firefox/.test(navigator.userAgent);
-    const isChrome = /Chrome|Chromium|CriOS/.test(navigator.userAgent) && !isFirefox;
 
-    // OneSignal v16 deferred init
+    // OneSignal v16: init + permission handling
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
@@ -140,28 +87,22 @@
           allowLocalhostAsSecureOrigin: true
         });
 
-        // Reflect current permission (boolean)
-        const granted = OneSignal.Notifications.permission;
-        updateStatus(`Browser permission: ${granted ? "granted" : "default/denied"}`, granted ? "ok" : "muted");
-        if (granted) { await finalizeSubscription(OneSignal); }
+        const granted = OneSignal.Notifications.permission; // boolean
+        setStatus(`Browser permission: ${granted ? "granted" : "default/denied"}`, granted ? "ok" : "muted");
+        if (granted) await afterGranted(OneSignal);
 
-        // React to changes
         OneSignal.Notifications.addEventListener("permissionChange", (permission) => {
-          updateStatus(`Browser permission: ${permission ? "granted" : "denied"}`, permission ? "ok" : "err");
-          if (permission) finalizeSubscription(OneSignal);
+          setStatus(`Browser permission: ${permission ? "granted" : "denied"}`, permission ? "ok" : "err");
+          if (permission) afterGranted(OneSignal);
         });
-
-        // Fill helper text
-        renderSettingsHelper();
-
       } catch (e) {
-        updateStatus("Failed to initialize OneSignal.", "err");
+        setStatus("Failed to initialize OneSignal.", "err");
         console.error(e);
       }
     });
 
-    async function requestPermission() {
-      const btn = document.getElementById("btn-enable");
+    async function onEnableClick() {
+      const btn = document.getElementById("enable");
       btn.disabled = true;
 
       if (iOS && !isStandalone) {
@@ -172,305 +113,60 @@
 
       try {
         const OneSignal = window.OneSignal;
-        await OneSignal.Notifications.requestPermission(); // v16: no return value
+        await OneSignal.Notifications.requestPermission(); // v16: no return
         const granted = OneSignal.Notifications.permission;
-        updateStatus(`User permission: ${granted ? "granted" : "denied"}`, granted ? "ok" : "err");
-        if (granted) await finalizeSubscription(OneSignal);
+        setStatus(`User permission: ${granted ? "granted" : "denied"}`, granted ? "ok" : "err");
+        if (granted) await afterGranted(OneSignal);
         else btn.disabled = false;
       } catch (e) {
-        updateStatus("Permission request failed.", "err");
+        setStatus("Permission request failed.", "err");
         console.error(e);
         btn.disabled = false;
       }
     }
 
-    async function finalizeSubscription(OneSignal) {
+    async function afterGranted(OneSignal) {
       try {
-        const tags = parseTags(tagsParam);
-        if (tags) {
-          try { await OneSignal.User.addTags(tags); } catch (e) { console.warn("addTags failed:", e); }
-        }
-        try {
-          const playerId = await OneSignal.User.getId();
-          console.log("OneSignal user ID:", playerId);
-        } catch {}
+        const tags = parseTags(tagsCSV);
+        if (tags) { try { await OneSignal.User.addTags(tags); } catch (e) { console.warn("addTags:", e); } }
+
+        try { console.log("OneSignal user ID:", await OneSignal.User.getId()); } catch {}
 
         document.getElementById("done").classList.remove("hidden");
-        document.getElementById("btn-enable").classList.add("hidden");
-        document.getElementById("btn-disable").classList.remove("hidden");
-        if (returnUrl) setTimeout(() => location.href = returnUrl, 700);
+        document.getElementById("enable").classList.add("hidden");
+        document.getElementById("disable").classList.remove("hidden");
 
+        if (returnTo) setTimeout(() => location.href = returnTo, 700);
       } catch (e) {
-        updateStatus("Subscription completed but final step failed.", "err");
+        setStatus("Subscribed, but a final step failed.", "err");
         console.error(e);
-        document.getElementById("btn-enable").disabled = false;
+        document.getElementById("enable").disabled = false;
       }
     }
 
-    // Try to disable/opt-out this device
-    async function disableNotifications() {
-      const btn = document.getElementById("btn-disable");
+    async function onDisableClick() {
+      const btn = document.getElementById("disable");
       btn.disabled = true;
       const OneSignal = window.OneSignal;
-
       try {
-        // v16 primary path
         if (OneSignal?.User?.PushSubscription?.optOut) {
           await OneSignal.User.PushSubscription.optOut();
         } else if (OneSignal?.Notifications?.unsubscribe) {
-          // fallback
           await OneSignal.Notifications.unsubscribe();
-        } else {
-          throw new Error("Opt-out API not available");
         }
-        updateStatus("Notifications disabled for this device.", "ok");
+        setStatus("Notifications disabled on this device.", "ok");
         document.getElementById("done").classList.add("hidden");
-        document.getElementById("btn-enable").classList.remove("hidden");
+        document.getElementById("enable").classList.remove("hidden");
         btn.classList.add("hidden");
       } catch (e) {
         console.error(e);
-        updateStatus("Couldn’t disable here. Use your browser’s notification settings.", "err");
+        setStatus("Couldn’t disable here. Use your browser’s site settings.", "err");
       } finally {
         btn.disabled = false;
       }
     }
 
-    function updateStatus(text, cls = "muted") {
-      const el = document.getElementById("status");
-      el.textContent = text;
-      el.className = cls;
-    }
-
-    // Render OS/Browser-specific “settings” instructions
-    function renderSettingsHelper() {
-      const box = document.getElementById("settings-steps");
-      const origin = location.origin;
-
-      let html = "";
-      if (iOS && isSafari) {
-        html = `
-          <ul class="steps">
-            <li>Open the app from your <strong>Home Screen</strong>.</li>
-            <li>Go to <strong>iOS Settings</strong> → <strong>Notifications</strong> → find this app’s name.</li>
-            <li>Enable <strong>Allow Notifications</strong> and your preferred styles.</li>
-          </ul>`;
-      } else if (isAndroid && isChrome) {
-        html = `
-          <ul class="steps">
-            <li>Open Chrome menu ⋮ → <strong>Settings</strong> → <strong>Notifications</strong>.</li>
-            <li>Scroll to <strong>Sites</strong>, tap <strong>${origin}</strong>, and adjust permissions.</li>
-            <li>If you don't see it, visit <strong>${origin}</strong>, tap the lock icon → <strong>Permissions</strong>.</li>
-          </ul>`;
-      } else if (isFirefox) {
-        html = `
-          <ul class="steps">
-            <li>Go to <strong>${origin}</strong>, click the padlock → <strong>Permissions</strong>.</li>
-            <li>Set <strong>Send Notifications</strong> to <em>Allow</em> or <em>Block</em>.</li>
-          </ul>`;
-      } else if (isChrome && (isMac || isWindows)) {
-        html = `
-          <ul class="steps">
-            <li>In Chrome, visit <strong>${origin}</strong>, click the padlock at left of the address bar.</li>
-            <li>Open <strong>Site settings</strong> → <strong>Notifications</strong> → choose <em>Allow</em>/<em>Block</em>.</li>
-          </ul>`;
-      } else {
-        html = `
-          <ul class="steps">
-            <li>Visit <strong>${origin}</strong>, use the padlock in the address bar to find <strong>Permissions</strong>.</li>
-            <li>Change <strong>Notifications</strong> to your preference.</li>
-          </ul>`;
-      }
-
-      box.innerHTML = html;
-    }
-  </script>
-</head>
-
-<body style="-webkit-overflow-scrolling:auto">
-  <!-- ===== Header bar (matches your Glide header) ===== -->
-  <header class="nav">
-    <div class="nav-inner">
-      <div class="logo" aria-label="Prices.je">
-        <img
-          src="https://firebasestorage.googleapis.com/v0/b/glide-prod.appspot.com/o/icon-images%2Fanonymous-522c67be-8f98-4f4c-9f0b-b82ee64faf97.png?alt=media&token=9901a592-a4e7-4907-8979-ac8b248ec2f8"
-          alt="Prices.je"
-          loading="eager"
-          height="64"
-        />
-      </div>
-    </div>
-  </header>
-
-  <!-- ===== Page content ===== -->
-  <main class="container" id="page-root">
-    <div class="card">
-      <h1>Enable Notifications</h1>
-      <p class="muted">Turn on push notifications for this device.</p>
-
-      <div id="iosHint" class="muted hidden" aria-live="polite">
-        <p><strong>On iPhone/iPad:</strong> add this page to your <strong>Home Screen</strong>, open it from there, then tap Enable.</p>
-        <p>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then re-open.</p>
-      </div>
-
-      <div class="row" role="group" aria-label="Push actions">
-        <button id="btn-enable" class="btn primary" onclick="requestPermission()">Enable notifications</button>
-        <button id="btn-disable" class="btn ghost hidden" onclick="disableNotifications()">Disable on this device</button>
-        <span id="status" class="muted" aria-live="polite">Waiting for your action…</span>
-        <span id="done" class="ok hidden" aria-live="polite">All set! You can close this page.</span>
-      </div>
-
-      <details class="helper">
-        <summary>Notification settings & troubleshooting</summary>
-        <div id="settings-steps"></div>
-        <p class="footer-note">Tip: You can pass tags via URL for segmentation →
-          <code>?tags=plan:pro,tier:gold&amp;return=&lt;URL&gt;</code>
-        </p>
-      </details>
-    </div>
-  </main>
-</body>
-</html>
-
-
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Prices.je Notifications</title>
-
-  <!-- OneSignal Web SDK (v16) -->
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-
-  <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 2rem; }
-    .card { max-width: 640px; margin: 0 auto; padding: 1.5rem; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; }
-    h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
-    p { margin: 0.5rem 0 1rem; line-height: 1.45; }
-    button { padding: .8rem 1rem; border-radius: 10px; border: 0; cursor: pointer; font-weight: 600; }
-    button.primary { background: #111; color: #fff; }
-    button:disabled { opacity: .5; cursor: not-allowed; }
-    .muted { opacity: .75; font-size: .95rem; }
-    .ok { color: #0a7f2e; font-weight: 600; }
-    .err { color: #b00020; font-weight: 600; }
-    .hidden { display: none; }
-    .row { margin-top: 1rem; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
-    code { background: rgba(0,0,0,.06); padding: .1rem .35rem; border-radius: 6px; }
-  </style>
-
-  <script>
-    const ONESIGNAL_APP_ID = "e0befc38-70d7-40c6-9a4d-ad74d23863c7";
-    const SAFARI_WEB_ID = "";               // optional
-    const SERVICE_WORKER_PATH = "OneSignalSDKWorker.js";
-    const SERVICE_WORKER_SCOPE = "/";
-    const DEFAULT_RETURN_URL = "https://prices.je/"; // optional
-
-    const params = new URLSearchParams(location.search);
-    const externalId = params.get("uid") || "";  // your user/account ID
-    const returnUrl  = params.get("return") || DEFAULT_RETURN_URL;
-    const tagsParam  = params.get("tags") || ""; // CSV of key:value
-
-    // iOS needs Add to Home Screen (PWA) for web push
-    const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
-    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-    // Parse tags from ?tags=plan:pro,tier:gold → { plan: "pro", tier: "gold" }
-    function parseTags(csv) {
-      if (!csv) return null;
-      const obj = {};
-      csv.split(",").forEach(pair => {
-        const [k, v] = pair.split(":").map(s => (s || "").trim());
-        if (k) obj[k] = v ?? "1";
-      });
-      return Object.keys(obj).length ? obj : null;
-    }
-
-    // OneSignal v16 deferred init
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async function(OneSignal) {
-      try {
-        await OneSignal.init({
-          appId: ONESIGNAL_APP_ID,
-          safariWebId: SAFARI_WEB_ID || undefined,
-          serviceWorkerPath: SERVICE_WORKER_PATH,
-          serviceWorkerParam: { scope: SERVICE_WORKER_SCOPE },
-          allowLocalhostAsSecureOrigin: true
-        });
-
-        // Pre-attach your external user ID (alias) if you have it
-        if (externalId) {
-          try { await OneSignal.login(externalId); } catch (e) { console.warn("login() will retry after permission:", e); }
-        }
-
-        const perm = await OneSignal.Notifications.getPermissionStatus(); // "default" | "granted" | "denied"
-        updateStatus(`Browser permission: ${perm}`, perm === "granted" ? "ok" : "muted");
-        if (perm === "granted") {
-          await finalizeSubscription(OneSignal);
-        }
-      } catch (e) {
-        updateStatus("Failed to initialize OneSignal.", "err");
-        console.error(e);
-      }
-    });
-
-    async function requestPermission() {
-      const btn = document.getElementById("btn");
-      btn.disabled = true;
-
-      if (iOS && !isStandalone) {
-        document.getElementById("iosHint").classList.remove("hidden");
-        btn.disabled = false;
-        return;
-      }
-
-      try {
-        const OneSignal = window.OneSignal;
-        const result = await OneSignal.Notifications.requestPermission(); // "granted" | "denied"
-        updateStatus(`User permission: ${result}`, result === "granted" ? "ok" : "err");
-        if (result === "granted") {
-          await finalizeSubscription(OneSignal);
-        } else {
-          btn.disabled = false;
-        }
-      } catch (e) {
-        updateStatus("Permission request failed.", "err");
-        console.error(e);
-        btn.disabled = false;
-      }
-    }
-
-    async function finalizeSubscription(OneSignal) {
-      try {
-        // Ensure external_id is set so you can target by External User ID in OneSignal
-        if (externalId) {
-          try { await OneSignal.login(externalId); } catch {}
-        }
-
-        // Optionally set tags for segmentation (visible in OneSignal dashboard)
-        const tags = parseTags(tagsParam);
-        if (tags) {
-          try { await OneSignal.User.addTags(tags); } catch (e) { console.warn("addTags failed:", e); }
-        }
-
-        // (Optional) fetch the OneSignal user ID for debugging
-        try {
-          const playerId = await OneSignal.User.getId();
-          console.log("OneSignal user ID:", playerId);
-        } catch {}
-
-        document.getElementById("done").classList.remove("hidden");
-        document.getElementById("btn").classList.add("hidden");
-        setTimeout(() => { if (returnUrl) location.href = returnUrl; }, 700);
-
-      } catch (e) {
-        updateStatus("Subscription failed after permission.", "err");
-        console.error(e);
-        document.getElementById("btn").disabled = false;
-      }
-    }
-
-    function updateStatus(text, cls = "muted") {
+    function setStatus(text, cls = "muted") {
       const el = document.getElementById("status");
       el.textContent = text;
       el.className = cls;
@@ -478,25 +174,29 @@
   </script>
 </head>
 <body>
-  <div class="card">
+  <main class="wrap">
     <h1>Enable Notifications</h1>
-    <p class="muted">Turn on push notifications for your device.</p>
+    <p class="muted">Turn on push notifications for this device. Buttons use the same blue as your app.</p>
 
-    <div id="iosHint" class="muted hidden">
-      <p><strong>On iPhone/iPad:</strong> first add this page to your Home Screen, open it from there, then tap Enable.</p>
+    <div id="iosHint" class="muted hidden" aria-live="polite">
+      <p><strong>On iPhone/iPad:</strong> add this page to your <strong>Home Screen</strong>, open it from there, then tap Enable.</p>
       <p>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then re-open.</p>
     </div>
 
-    <div class="row">
-      <button id="btn" class="primary" onclick="requestPermission()">Enable notifications</button>
-      <span id="status" class="muted">Waiting for your action…</span>
-      <span id="done" class="ok hidden">All set! You can close this page.</span>
+    <div class="row" role="group" aria-label="Push actions">
+      <button id="enable" class="btn primary" onclick="onEnableClick()">Enable notifications</button>
+      <button id="disable" class="btn outline hidden" onclick="onDisableClick()">Disable on this device</button>
+      <span id="status" class="muted" aria-live="polite">Waiting for your action…</span>
+      <span id="done" class="ok hidden" aria-live="polite">All set! You can close this page.</span>
     </div>
 
-    <p class="muted">
-      Tip: Link here with
-      <code>?uid=&lt;EXTERNAL_ID&gt;&amp;tags=plan:pro,tier:gold&amp;return=&lt;URL&gt;</code>
-    </p>
-  </div>
+    <details>
+      <summary>Troubleshooting & settings</summary>
+      <p class="muted">If you blocked notifications before, open your browser’s <em>Site settings</em> for this page and set <strong>Notifications</strong> to <em>Allow</em>. On iOS, it must be installed to the Home Screen first.</p>
+      <p class="muted">Optional tags via URL:
+        <code>?tags=plan:pro,tier:gold&amp;return=&lt;URL&gt;</code>
+      </p>
+    </details>
+  </main>
 </body>
 </html>
