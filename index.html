@@ -5,60 +5,42 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Prices.je Notifications</title>
 
+  <!-- Make iOS treat this like an installable web app -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="https://res.cloudinary.com/glide/image/fetch/f_auto,w_525,h_525,c_lfill/https%3A%2F%2Ffirebasestorage.googleapis.com%2Fv0%2Fb%2Fglide-prod.appspot.com%2Fo%2Ficon-images%252Fanonymous-cd851ccf-8f64-4408-a04a-5f22ac07aa4a.png%3Falt%3Dmedia%26token%3De8d9bd0a-8b2d-4cb9-b7c8-9a77d9796b39">
+  <meta name="theme-color" content="#0068B3">
+
   <!-- OneSignal Web SDK (v16) -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 
   <style>
-    :root {
-      --blue: #0068B3;
-      --text: #182026;
-      --bg: #ffffff;
-      --ok: #0a7f2e;
-      --err: #b00020;
-    }
-    html, body { height: 100%; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      -webkit-font-smoothing: antialiased;
-    }
-    .wrap {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-    h1 { margin: 0 0 8px; font-size: 1.25rem; }
-    p  { margin: 8px 0 16px; line-height: 1.45; }
-    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .muted { opacity: .75; }
-    .ok { color: var(--ok); font-weight: 600; }
-    .err { color: var(--err); font-weight: 600; }
-    .hidden { display: none !important; }
-
-    .btn {
-      appearance: none; border: 0; border-radius: 10px;
-      padding: .8rem 1rem; font-weight: 600; cursor: pointer;
-    }
-    .btn.primary { background: var(--blue); color: #fff; }
-    .btn.outline  { background: transparent; color: var(--blue); border: 2px solid var(--blue); }
-    .btn:disabled { opacity: .55; cursor: not-allowed; }
-
-    details { margin-top: 14px; }
+    :root { --blue:#0068B3; --text:#182026; --bg:#fff; --ok:#0a7f2e; --err:#b00020; }
+    html,body { height:100% }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text) }
+    .wrap { max-width:720px; margin:0 auto; padding:24px }
+    h1 { margin:0 0 8px; font-size:1.25rem }
+    p { margin:8px 0 16px; line-height:1.45 }
+    .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center }
+    .muted { opacity:.75 } .ok{ color:var(--ok); font-weight:600 } .err{ color:var(--err); font-weight:600 }
+    .hidden { display:none!important }
+    .btn { appearance:none; border:0; border-radius:10px; padding:.8rem 1rem; font-weight:600; cursor:pointer }
+    .btn.primary { background:var(--blue); color:#fff } .btn.outline{ background:transparent; color:var(--blue); border:2px solid var(--blue) }
+    .btn:disabled { opacity:.55; cursor:not-allowed }
   </style>
 
   <script>
     const ONESIGNAL_APP_ID     = "e0befc38-70d7-40c6-9a4d-ad74d23863c7";
-    const SAFARI_WEB_ID        = "";   // optional with v16; often not needed
+    const SAFARI_WEB_ID        = "";   // optional for v16
     const SERVICE_WORKER_PATH  = "OneSignalSDKWorker.js";
     const SERVICE_WORKER_SCOPE = "/";
-    
-    // iOS needs PWA install
-    const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
-    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-    // OneSignal v16: init + permission handling
+    // iOS detection: prefer navigator.standalone; fall back to display-mode
+    const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const inStandalone = (('standalone' in navigator) && navigator.standalone) ||
+                         (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+
+    // OneSignal init
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
@@ -69,6 +51,14 @@
           serviceWorkerParam: { scope: SERVICE_WORKER_SCOPE },
           allowLocalhostAsSecureOrigin: true
         });
+
+        // If we’re on iOS but NOT launched from Home Screen, show instructions and bail.
+        if (isiOS && !inStandalone) {
+          setStatus("Install to Home Screen first (Share → Add to Home Screen), then open from the icon.", "err");
+          document.getElementById("iosHint").classList.remove("hidden");
+          document.getElementById("enable").disabled = true;
+          return;
+        }
 
         const granted = OneSignal.Notifications.permission; // boolean
         setStatus(`Browser permission: ${granted ? "granted" : "default/denied"}`, granted ? "ok" : "muted");
@@ -88,15 +78,17 @@
       const btn = document.getElementById("enable");
       btn.disabled = true;
 
-      if (iOS && !isStandalone) {
+      // Guard again at click-time for iOS HS requirement
+      if (isiOS && !inStandalone) {
         document.getElementById("iosHint").classList.remove("hidden");
+        setStatus("Install to Home Screen and open from there to enable.", "err");
         btn.disabled = false;
         return;
       }
 
       try {
         const OneSignal = window.OneSignal;
-        await OneSignal.Notifications.requestPermission(); // v16: no return value
+        await OneSignal.Notifications.requestPermission(); // v16: no return
         const granted = OneSignal.Notifications.permission;
         setStatus(`User permission: ${granted ? "granted" : "denied"}`, granted ? "ok" : "err");
         if (granted) await afterGranted(OneSignal);
@@ -111,7 +103,6 @@
     async function afterGranted(OneSignal) {
       try {
         try { console.log("OneSignal user ID:", await OneSignal.User.getId()); } catch {}
-
         document.getElementById("done").classList.remove("hidden");
         document.getElementById("enable").classList.add("hidden");
         document.getElementById("disable").classList.remove("hidden");
@@ -157,8 +148,7 @@
     <p class="muted">Turn on push notifications for this device.</p>
 
     <div id="iosHint" class="muted hidden" aria-live="polite">
-      <p><strong>On iPhone/iPad:</strong> add this page to your <strong>Home Screen</strong>, open it from there, then tap Enable.</p>
-      <p>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then re-open.</p>
+      <p><strong>iPhone/iPad:</strong> open this page in <strong>Safari</strong>, tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then open it from the new Home-Screen icon and tap Enable.</p>
     </div>
 
     <div class="row" role="group" aria-label="Push actions">
@@ -170,7 +160,7 @@
 
     <details>
       <summary>Troubleshooting</summary>
-      <p class="muted">If you blocked notifications before, open your browser’s <em>Site settings</em> for this page and set <strong>Notifications</strong> to <em>Allow</em>. On iOS, the page must be installed on the Home Screen first.</p>
+      <p class="muted">iOS only allows web push from Home-Screen web apps (iOS 16.4+). If you blocked notifications before, use your browser’s Site settings to allow them.</p>
     </details>
   </main>
 </body>
